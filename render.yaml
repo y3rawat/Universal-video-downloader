@@ -1,0 +1,51 @@
+# Render Blueprint - MindStore with Cobalt + yt-dlp
+# Deploys: Cobalt API + Downloader (yt-dlp) as 2 services
+#
+# Production URLs:
+#   Cobalt API: https://mindstore-cobalt-api.onrender.com
+#   Downloader: https://universal-video-downloader-2bv8.onrender.com
+
+services:
+  # 1. Cobalt API Server (official Cobalt Docker image)
+  # NOTE: For Instagram support, you need to set up cookies via Render's Secret Files
+  # Add a secret file at /cookies.json with your Instagram cookies
+  - type: web
+    name: mindstore-cobalt-api
+    runtime: docker
+    dockerCommand: ""
+    image:
+      url: ghcr.io/imputnet/cobalt:latest
+    envVars:
+      - key: API_URL
+        value: https://mindstore-cobalt-api.onrender.com
+      - key: API_PORT
+        value: 9000
+      - key: CORS_WILDCARD
+        value: "1"
+      - key: CORS_URL
+        value: "*"
+      # Uncomment after adding secret file for cookies
+      # - key: COOKIE_PATH
+      #   value: /cookies.json
+    healthCheckPath: /
+
+  # 2. Downloader Server (your code: tries Cobalt → then yt-dlp)
+  - type: web
+    name: universal-video-downloader
+    runtime: docker
+    dockerfilePath: cobalt-downloader/server/Dockerfile
+    dockerContext: cobalt-downloader/server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3002
+      # Points to the Cobalt API service above
+      - key: COBALT_URL
+        value: https://mindstore-cobalt-api.onrender.com
+      # Backend API for Drive upload and Firebase updates
+      - key: BACKEND_URL
+        value: https://mindstore-backend.vercel.app/api
+      - key: ALLOWED_ORIGINS
+        value: "*"
