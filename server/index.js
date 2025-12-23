@@ -16,7 +16,44 @@ const PORT = process.env.PORT || 3002;
 const COBALT_API = process.env.COBALT_URL || 'https://mindstore-cobalt-api.onrender.com';
 
 // Backend API URL - for uploading to Drive and updating Firebase
-const BACKEND_API = process.env.BACKEND_URL || 'http://localhost:3000/api';
+// Default to backend dev port 3001 (was 3000 causing fetch failures)
+const BACKEND_API = process.env.BACKEND_URL || 'http://localhost:3001/api';
+
+// Some dev setups run services in Docker and use host.docker.internal.
+// When not running in Docker, that hostname will fail. Try multiple bases.
+const BACKEND_API_CANDIDATES = Array.from(
+  new Set(
+    [
+      BACKEND_API,
+      'http://localhost:3001/api',
+      'http://127.0.0.1:3001/api',
+      'http://host.docker.internal:3001/api',
+    ].filter(Boolean)
+  )
+);
+
+function normalizeBackendPath(pathname) {
+  if (!pathname) return '/';
+  return pathname.startsWith('/') ? pathname : `/${pathname}`;
+}
+
+async function fetchFromBackend(pathname, options) {
+  const normalizedPath = normalizeBackendPath(pathname);
+  let lastErr;
+
+  for (const baseUrl of BACKEND_API_CANDIDATES) {
+    const target = `${baseUrl}${normalizedPath}`;
+    try {
+      const response = await fetch(target, options);
+      return { response, baseUrl };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  const details = lastErr?.message ? `: ${lastErr.message}` : '';
+  throw new Error(`All backend endpoints failed${details}`);
+}
 
 // YouTube cookies for bot detection bypass (from environment or local file)
 let YOUTUBE_COOKIES = process.env.YOUTUBE_COOKIES || null;
@@ -45,7 +82,7 @@ const COOKIE_EXPIRY_DAYS = {
 // Fetch cookies from backend (Firebase)
 async function fetchCookiesFromBackend(platform) {
   try {
-    const response = await fetch(`${BACKEND_API}/cookies/${platform}`);
+    const { response, baseUrl } = await fetchFromBackend(`/cookies/${platform}`);
     const data = await response.json();
 
     if (data.success && data.cookies) {
@@ -54,7 +91,7 @@ async function fetchCookiesFromBackend(platform) {
         syncedAt: data.syncedAt,
         expiresAt: data.expiresAt
       };
-      console.log(`🍪 Loaded ${platform} cookies from Firebase`);
+      console.log(`🍪 Loaded ${platform} cookies from Firebase via ${baseUrl}`);
       return data.cookies;
     }
     return null;
@@ -212,7 +249,7 @@ async function uploadToDriveViaBackend(filePath, url, userId, contentHash, metad
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minute timeout
 
     // Send to backend upload-to-drive endpoint with metadata
-    const response = await fetch(`${BACKEND_API}/upload-to-drive`, {
+    const { response, baseUrl } = await fetchFromBackend('/upload-to-drive', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
@@ -237,6 +274,7 @@ async function uploadToDriveViaBackend(filePath, url, userId, contentHash, metad
     clearTimeout(timeoutId);
     const apiTime = Date.now() - uploadStart;
     console.log(`⏱️ [UPLOAD] Backend API call: ${apiTime}ms`);
+    console.log(`🌐 [UPLOAD] Backend used: ${baseUrl}`);
 
     // Check if response is ok before parsing JSON
     if (!response.ok) {
@@ -246,13 +284,16 @@ async function uploadToDriveViaBackend(filePath, url, userId, contentHash, metad
     }
 
     const data = await response.json();
+    console.log(`📊 Backend response:`, JSON.stringify(data, null, 2).substring(0, 500));
 
-    if (data.success) {
+    // Treat "skipped" as non-success for Drive-link purposes
+    if (data.success && !data.skipped) {
       const viewLink = data.driveFile?.webViewLink || data.viewLink;
       const fileId = data.driveFile?.id || data.fileId;
       const totalTime = Date.now() - uploadStart;
       console.log(`\n✅ ========== DRIVE UPLOAD COMPLETE ==========`);
       console.log(`🔗 Link: ${viewLink}`);
+      console.log(`📋 FileId: ${fileId}`);
       console.log(`⏱️ Total upload time: ${totalTime}ms (${(totalTime / 1000).toFixed(1)}s)`);
       console.log(`==============================================\n`);
       // Clean up local file after successful upload
@@ -264,6 +305,7 @@ async function uploadToDriveViaBackend(filePath, url, userId, contentHash, metad
       };
     } else {
       console.log(`❌ Drive upload failed: ${data.error}`);
+      console.log(`📊 Error response:`, JSON.stringify(data, null, 2));
       return { success: false, error: data.error };
     }
   } catch (error) {
@@ -422,6 +464,11 @@ async function downloadWithCobalt(url) {
           return;
         }
 
+
+        if (data.success && data.skipped) {
+          console.log(`⚠️ Drive upload skipped by backend (not configured)`);
+          return { success: false, error: 'Drive upload skipped by backend (not configured)', skipped: true };
+        }
         const stats = fs.statSync(outputPath);
         console.log(`Downloaded file size: ${stats.size} bytes`);
 
@@ -1063,7 +1110,6 @@ app.post('/api/cookies', (req, res) => {
     syncedAt: now,
     expiresAt: now + (expiryDays * 24 * 60 * 60 * 1000) // Convert days to ms
   };
-  savePlatformCookies();
 
   console.log(`🍪 Received ${platform} cookies from extension (expires in ${expiryDays} days)`);
 
