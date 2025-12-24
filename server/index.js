@@ -904,11 +904,11 @@ app.post('/api/download', async (req, res) => {
     logStep('3. Refreshed cookies from Firebase');
   }
 
-  // For Instagram/Twitter/YouTube with cookies, try yt-dlp first (Cobalt API doesn't have our cookies)
+  // For Instagram/Twitter with cookies, try yt-dlp first (Cobalt API doesn't have our cookies)
+  // For YouTube: Try Cobalt first (better infrastructure), then yt-dlp with cookies as fallback
   if ((isInstagram && platformCookies.instagram?.cookies) ||
-    (isTwitter && platformCookies.twitter?.cookies) ||
-    (isYoutube && platformCookies.youtube?.cookies)) {
-    const platformName = isInstagram ? 'Instagram' : isTwitter ? 'Twitter' : 'YouTube';
+    (isTwitter && platformCookies.twitter?.cookies)) {
+    const platformName = isInstagram ? 'Instagram' : 'Twitter';
     console.log(`🍪 Using yt-dlp with ${platformName} cookies (Cobalt API lacks cookie access)...`);
     logStep('4. Starting yt-dlp download');
     const ytdlpResult = await downloadWithYtdlp(url);
