@@ -6,15 +6,14 @@
 #   Downloader: https://universal-video-downloader-2bv8.onrender.com
 
 services:
-  # 1. Cobalt API Server (official Cobalt Docker image)
-  # NOTE: For Instagram support, you need to set up cookies via Render's Secret Files
-  # Add a secret file at /cookies.json with your Instagram cookies
+  # 1. Cobalt API Server (custom image with Firebase cookie sync)
+  # Automatically fetches cookies from Firebase backend on startup
   - type: web
     name: mindstore-cobalt-api
     runtime: docker
-    dockerCommand: ""
-    image:
-      url: ghcr.io/imputnet/cobalt:latest
+    dockerfilePath: cobalt-downloader/cobalt-api/Dockerfile
+    dockerContext: cobalt-downloader/cobalt-api
+    healthCheckPath: /
     envVars:
       - key: API_URL
         value: https://mindstore-cobalt-api.onrender.com
@@ -24,10 +23,10 @@ services:
         value: "1"
       - key: CORS_URL
         value: "*"
-      # Uncomment after adding secret file for cookies
-      # - key: COOKIE_PATH
-      #   value: /cookies.json
-    healthCheckPath: /
+      - key: COOKIE_PATH
+        value: /cookies.json
+      - key: BACKEND_URL
+        value: https://mindstore-backend.onrender.com/api
 
   # 2. Downloader Server (your code: tries Cobalt → then yt-dlp)
   - type: web
