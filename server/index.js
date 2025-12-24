@@ -404,16 +404,37 @@ async function checkVideoStatus(url) {
 // Try to download with Cobalt - downloads to temp file first
 async function downloadWithCobalt(url) {
   try {
+    console.log(`🔗 Calling Cobalt API: ${COBALT_API}`);
+    console.log(`📨 Request body: ${JSON.stringify({ url })}`);
+
+    // Add timeout to handle cold starts (Render free tier can take 30-60s)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000); // 90 second timeout
+
     const response = await fetch(COBALT_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify({ url })
+      body: JSON.stringify({ url }),
+      signal: controller.signal
     });
 
-    const data = await response.json();
+    clearTimeout(timeout);
+
+    console.log(`📬 Cobalt response status: ${response.status} ${response.statusText}`);
+
+    const responseText = await response.text();
+    console.log(`📝 Cobalt response (first 500 chars): ${responseText.substring(0, 500)}`);
+
+    // Try to parse as JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      throw new Error(`Invalid JSON from Cobalt: ${responseText.substring(0, 200)}`);
+    }
 
     if (data.status === 'error') {
       throw new Error(data.error?.code || 'Cobalt failed');
