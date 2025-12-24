@@ -46,6 +46,6 @@ services:
         value: https://mindstore-cobalt-api.onrender.com
       # Backend API for Drive upload and Firebase updates
       - key: BACKEND_URL
-        value: https://mindstore-backend.vercel.app/api
+        value: https://mindstore-backend.onrender.com/api
       - key: ALLOWED_ORIGINS
         value: "*"
