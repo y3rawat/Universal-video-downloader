@@ -7,13 +7,10 @@ FROM ghcr.io/imputnet/cobalt:latest
 USER root
 RUN apk add --no-cache curl
 
-# Copy the fetch script
-COPY fetch-cookies.sh /fetch-cookies.sh
-RUN chmod +x /fetch-cookies.sh
-
-# Copy entrypoint wrapper
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Copy the fetch script and entrypoint
+COPY ./fetch-cookies.sh /fetch-cookies.sh
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /fetch-cookies.sh /entrypoint.sh
 
 # Switch back to non-root user
 USER 1000
