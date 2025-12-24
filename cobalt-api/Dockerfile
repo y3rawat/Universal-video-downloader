@@ -7,9 +7,9 @@ FROM ghcr.io/imputnet/cobalt:latest
 USER root
 RUN apk add --no-cache curl
 
-# Copy the fetch script and entrypoint from the cobalt-api folder
-COPY cobalt-api/fetch-cookies.sh /fetch-cookies.sh
-COPY cobalt-api/entrypoint.sh /entrypoint.sh
+# Copy the fetch script and entrypoint
+COPY fetch-cookies.sh /fetch-cookies.sh
+COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /fetch-cookies.sh /entrypoint.sh
 
 # Switch back to non-root user
