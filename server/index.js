@@ -139,12 +139,27 @@ function createCookieFile(platform, cookieString) {
     const [name, ...valueParts] = cookie.split('=');
     const value = valueParts.join('='); // Handle values with = in them
     if (name && value) {
+      const cookieName = name.trim();
+      // For YouTube: Some cookies use .google.com domain for cross-site auth
+      // SID, HSID, SSID, APISID, SAPISID, __Secure-* cookies work on both domains
+      let cookieDomain = domain;
+      if (platform === 'youtube' && (
+        cookieName.startsWith('__Secure-') ||
+        ['SID', 'HSID', 'SSID', 'APISID', 'SAPISID'].includes(cookieName)
+      )) {
+        // Add cookie for both .youtube.com AND .google.com
+        const expiry = Math.floor(Date.now() / 1000) + 86400 * 365;
+        lines.push(`.youtube.com\tTRUE\t/\tTRUE\t${expiry}\t${cookieName}\t${value.trim()}`);
+        lines.push(`.google.com\tTRUE\t/\tTRUE\t${expiry}\t${cookieName}\t${value.trim()}`);
+        return;
+      }
       // Format: domain\tinclude_subdomains\tpath\tsecure\texpiry\tname\tvalue
-      lines.push(`${domain}\tTRUE\t/\tTRUE\t${Math.floor(Date.now() / 1000) + 86400 * 365}\t${name.trim()}\t${value.trim()}`);
+      lines.push(`${cookieDomain}\tTRUE\t/\tTRUE\t${Math.floor(Date.now() / 1000) + 86400 * 365}\t${cookieName}\t${value.trim()}`);
     }
   });
 
   fs.writeFileSync(cookieFilePath, lines.join('\n'));
+  console.log(`📝 Created cookie file at ${cookieFilePath} with ${lines.length - 3} cookies`);
   return cookieFilePath;
 }
 
