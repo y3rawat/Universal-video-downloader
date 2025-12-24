@@ -564,6 +564,16 @@ async function downloadWithYtdlp(url) {
       '--write-info-json'  // Save metadata to JSON file for caption/thumbnail extraction
     );
 
+    // For YouTube: Add browser-like User-Agent and special extractor args
+    if (isYoutube) {
+      ytdlpArgs.push(
+        '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        '--extractor-args', 'youtube:player_client=web',  // Use web player (less strict)
+        '--sleep-interval', '1',  // Small delay between requests
+        '--max-sleep-interval', '3'
+      );
+    }
+
     // Add platform-specific cookies if available and not expired
     let cookiesFile = null;
     const now = Date.now();
