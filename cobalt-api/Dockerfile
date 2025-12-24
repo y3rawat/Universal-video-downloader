@@ -7,6 +7,9 @@ FROM ghcr.io/imputnet/cobalt:latest
 USER root
 RUN apk add --no-cache curl
 
+# Create writable directory for cookies
+RUN mkdir -p /app/cookies && chown -R 1000:1000 /app/cookies
+
 # Copy the fetch script and entrypoint
 COPY fetch-cookies.sh /fetch-cookies.sh
 COPY entrypoint.sh /entrypoint.sh
@@ -15,8 +18,8 @@ RUN chmod +x /fetch-cookies.sh /entrypoint.sh
 # Switch back to non-root user
 USER 1000
 
-# Set environment variables
-ENV COOKIE_PATH=/cookies.json
+# Set environment variables - use writable path
+ENV COOKIE_PATH=/app/cookies/cookies.json
 ENV BACKEND_URL=https://mindstore-backend.onrender.com/api
 
 # Use our custom entrypoint

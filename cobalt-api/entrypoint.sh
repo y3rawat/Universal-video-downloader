@@ -7,15 +7,15 @@ echo "📡 Backend URL: $BACKEND_URL"
 # Fetch cookies from Firebase
 /fetch-cookies.sh
 
-# Check if cookies.json was created
-if [ -f /cookies.json ]; then
-  echo "✅ Cookies file ready"
-  cat /cookies.json | head -c 200
-  echo "..."
+# Check if cookies file was created
+COOKIE_FILE="${COOKIE_PATH:-/app/cookies/cookies.json}"
+if [ -f "$COOKIE_FILE" ]; then
+  echo "✅ Cookies file ready at $COOKIE_FILE"
+  echo "📄 Cookie file size: $(wc -c < "$COOKIE_FILE") bytes"
 else
-  echo "⚠️ No cookies.json created (will work without auth for some videos)"
+  echo "⚠️ No cookies file created (will work without auth for some videos)"
 fi
 
-# Start the original Cobalt entrypoint
+# Start Cobalt - run the Node.js app directly
 echo "🎬 Starting Cobalt..."
-exec /app/docker-entrypoint.sh
+cd /app && exec node src/cobalt.js

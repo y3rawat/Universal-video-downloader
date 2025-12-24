@@ -84,8 +84,9 @@ build_cookies_json() {
   
   COOKIES_JSON="${COOKIES_JSON}}"
   
-  echo "$COOKIES_JSON" > /cookies.json
-  echo "💾 Saved cookies to /cookies.json"
+  COOKIE_OUTPUT="${COOKIE_PATH:-/app/cookies/cookies.json}"
+  echo "$COOKIES_JSON" > "$COOKIE_OUTPUT"
+  echo "💾 Saved cookies to $COOKIE_OUTPUT"
 }
 
 # Main
