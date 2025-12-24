@@ -827,11 +827,13 @@ app.post('/api/download', async (req, res) => {
   }
 
   // Skip video status check for Instagram/Twitter (they require cookies)
-  // Just try downloading directly
+  // Also skip for YouTube if we have cookies (status check doesn't use cookies)
   let status = { status: 'available' };
+  const isYoutube = url.includes('youtube.com') || url.includes('youtu.be');
+  const hasYoutubeCookies = isYoutube && platformCookies.youtube?.cookies;
 
-  if (!isInstagram && !isTwitter) {
-    // Only check status for YouTube and other platforms
+  if (!isInstagram && !isTwitter && !hasYoutubeCookies) {
+    // Only check status for platforms without cookies
     logStep('2. Checking video status');
     status = await checkVideoStatus(url);
     logStep('3. Status check done');
@@ -863,17 +865,26 @@ app.post('/api/download', async (req, res) => {
       });
     }
   } else {
-    console.log(`⏭️ Skipping status check for ${isInstagram ? 'Instagram' : 'Twitter'} (requires cookies)`);
+    const platformName = isInstagram ? 'Instagram' : isTwitter ? 'Twitter' : 'YouTube (has cookies)';
+    console.log(`⏭️ Skipping status check for ${platformName}`);
     logStep('2. Skipped status check');
     // Refresh cookies from Firebase before attempting download
-    const platform = isInstagram ? 'instagram' : 'twitter';
-    await fetchCookiesFromBackend(platform);
+    if (isInstagram) {
+      await fetchCookiesFromBackend('instagram');
+    } else if (isTwitter) {
+      await fetchCookiesFromBackend('twitter');
+    } else if (isYoutube) {
+      await fetchCookiesFromBackend('youtube');
+    }
     logStep('3. Refreshed cookies from Firebase');
   }
 
-  // For Instagram/Twitter with cookies, try yt-dlp first (Cobalt API doesn't have our cookies)
-  if ((isInstagram && platformCookies.instagram?.cookies) || (isTwitter && platformCookies.twitter?.cookies)) {
-    console.log('🍪 Using yt-dlp with cookies (Cobalt API lacks cookie access)...');
+  // For Instagram/Twitter/YouTube with cookies, try yt-dlp first (Cobalt API doesn't have our cookies)
+  if ((isInstagram && platformCookies.instagram?.cookies) ||
+    (isTwitter && platformCookies.twitter?.cookies) ||
+    (isYoutube && platformCookies.youtube?.cookies)) {
+    const platformName = isInstagram ? 'Instagram' : isTwitter ? 'Twitter' : 'YouTube';
+    console.log(`🍪 Using yt-dlp with ${platformName} cookies (Cobalt API lacks cookie access)...`);
     logStep('4. Starting yt-dlp download');
     const ytdlpResult = await downloadWithYtdlp(url);
     logStep(`5. yt-dlp finished (success: ${ytdlpResult.success})`);
