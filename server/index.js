@@ -32,6 +32,13 @@ const BACKEND_API_CANDIDATES = Array.from(
   )
 );
 
+// ========== VIDEO QUALITY LIMITS (for Render resource constraints) ==========
+// These can be overridden via environment variables
+const MAX_VIDEO_HEIGHT = parseInt(process.env.MAX_VIDEO_HEIGHT || '480', 10);  // 480p default
+const MAX_VIDEO_FILESIZE_MB = parseInt(process.env.MAX_VIDEO_FILESIZE_MB || '50', 10);  // 50MB default
+const PREFER_AV1 = process.env.PREFER_AV1 === 'true';  // AV1 is smaller but slower to encode
+console.log(`📊 Quality limits: ${MAX_VIDEO_HEIGHT}p max, ${MAX_VIDEO_FILESIZE_MB}MB max filesize`);
+
 function normalizeBackendPath(pathname) {
   if (!pathname) return '/';
   return pathname.startsWith('/') ? pathname : `/${pathname}`;
@@ -566,12 +573,22 @@ async function downloadWithYtdlp(url) {
 
     // For Instagram: prefer combined format (video+audio in single stream) to avoid merge issues
     if (isInstagram) {
-      ytdlpArgs.push('-f', 'best[ext=mp4]/best');
+      // Cap Instagram to configured max height
+      ytdlpArgs.push('-f', `best[height<=${MAX_VIDEO_HEIGHT}][ext=mp4]/best[height<=${MAX_VIDEO_HEIGHT}]/best`);
     } else {
       // Prefer H.264 codec (avc1) which doesn't need re-encoding - much faster!
-      // Fallback to best quality if H.264 not available
-      ytdlpArgs.push('-f', 'bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best');
+      // Cap resolution to MAX_VIDEO_HEIGHT (default 480p) to stay under Render limits
+      const heightFilter = `[height<=${MAX_VIDEO_HEIGHT}]`;
+      ytdlpArgs.push('-f', 
+        `bestvideo${heightFilter}[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/` +
+        `bestvideo${heightFilter}[ext=mp4]+bestaudio[ext=m4a]/` +
+        `bestvideo${heightFilter}+bestaudio/` +
+        `best${heightFilter}/best`
+      );
     }
+
+    // Add max filesize limit to prevent huge downloads
+    ytdlpArgs.push('--max-filesize', `${MAX_VIDEO_FILESIZE_MB}M`);
 
     ytdlpArgs.push(
       '--merge-output-format', 'mp4',

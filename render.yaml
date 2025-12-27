@@ -48,3 +48,8 @@ services:
         value: https://mindstore-backend.onrender.com/api
       - key: ALLOWED_ORIGINS
         value: "*"
+      # Video quality limits to stay under Render resource constraints
+      - key: MAX_VIDEO_HEIGHT
+        value: "480"
+      - key: MAX_VIDEO_FILESIZE_MB
+        value: "50"
